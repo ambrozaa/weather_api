@@ -1,6 +1,7 @@
 require 'grape'
 require 'httparty'
 require 'rufus-scheduler'
+require 'active_support/cache'
 
 module Weather
   class Api < Grape::API
@@ -14,17 +15,25 @@ module Weather
 
     resource :weather do
       helpers do
-        def fetch_current_temperature(city)
-          location_key = get_location_key(city)
-          response = HTTParty.get("https://dataservice.accuweather.com/currentconditions/v1/#{location_key}?apikey=#{ENV['ACCUWEATHER_API_KEY']}")
-          response.parsed_response.first['Temperature']['Metric']['Value']
+        CACHE = ActiveSupport::Cache::MemoryStore.new
 
+        def fetch_current_temperature(city)
+          cache_key = "current_temperature_#{city}"
+          temperature = CACHE.fetch(cache_key, expires_in: 30.minutes) do
+            location_key = get_location_key(city)
+            response = HTTParty.get("https://dataservice.accuweather.com/currentconditions/v1/#{location_key}?apikey=#{ENV['ACCUWEATHER_API_KEY']}")
+            response.parsed_response.first['Temperature']['Metric']['Value']
+          end
+          temperature
         end
 
         def get_location_key(city)
-          response = HTTParty.get("https://dataservice.accuweather.com/locations/v1/cities/search?apikey=#{ENV['ACCUWEATHER_API_KEY']}&q=#{city}")
-          response.parsed_response.first['Key']
-
+          cache_key = "location_key_#{city}"
+          location_key = CACHE.fetch(cache_key, expires_in: 1.day) do
+            response = HTTParty.get("https://dataservice.accuweather.com/locations/v1/cities/search?apikey=#{ENV['ACCUWEATHER_API_KEY']}&q=#{city}")
+            response.parsed_response.first['Key']
+          end
+          location_key
         end
 
         def save_temperature(city, value)
@@ -38,6 +47,7 @@ module Weather
         save_temperature(city, temperature)
         { city: city, temperature: temperature }
       end
+
 
       get 'historical' do
         city = params[:city] || 'Moscow'
@@ -68,12 +78,15 @@ module Weather
         city = params[:city] || 'Moscow'
         timestamp = params[:timestamp].to_i unless params[:timestamp].blank?
 
-        temperature = Temperature.where(city: city, timestamp: timestamp).first
-
-        if temperature
-          render json: { city: city, temperature: temperature.value }, status: :ok
+        if timestamp
+          temperature = Temperature.where(city: city, timestamp: Time.at(timestamp)).first
+          if temperature
+            { city: city, temperature: temperature.value }
+          else
+            error!('No data available', 404)
+          end
         else
-          error!('No data available', 404)
+          error!('Timestamp parameter is required', 400)
         end
       end
 

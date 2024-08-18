@@ -7,8 +7,6 @@ gem "sqlite3", "~> 1.4"
 gem "puma", ">= 5.0"
 
 gem 'grape'
-gem 'rspec-rails'
-gem 'vcr'
 gem 'httparty'
 gem 'delayed_job_active_record'
 gem 'rufus-scheduler'
@@ -22,6 +20,9 @@ group :development, :test do
   gem 'byebug'
   gem 'dotenv-rails'
   gem "debug", platforms: %i[ mri windows ]
+  gem 'rspec-rails'
+  gem 'vcr'
+  gem 'webmock'
 end
 
 group :development do
