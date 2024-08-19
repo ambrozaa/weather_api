@@ -3,6 +3,7 @@ require 'httparty'
 require 'rufus-scheduler'
 require 'active_support/cache'
 
+
 module Weather
   class Api < Grape::API
     format :json
@@ -38,6 +39,11 @@ module Weather
 
         def save_temperature(city, value)
           Temperature.create(city: city, timestamp: Time.now, value: value)
+        end
+
+        def update_weather_data(city)
+          temperature = fetch_current_temperature(city)
+          save_temperature(city, temperature)
         end
       end
 

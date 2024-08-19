@@ -2,7 +2,6 @@ require 'rails_helper'
 
 RSpec.describe 'Weather API', type: :request do
   before do
-    # Убедитесь, что данные очищены перед выполнением тестов
     Temperature.destroy_all
   end
 
